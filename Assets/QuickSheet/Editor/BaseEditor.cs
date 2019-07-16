@@ -69,7 +69,7 @@ namespace UnityQuickSheet
         {
             // Draw 'spreadsheet' and 'worksheet' name.
             EditorGUILayout.TextField(spreadsheetProp.name, spreadsheetProp.stringValue);
-            EditorGUILayout.TextField(worksheetProp.name, worksheetProp.stringValue);
+            //EditorGUILayout.TextField(worksheetProp.name, worksheetProp.stringValue);
 
             // Draw properties of the data class.
             if (useGUIStyle && !isGUISkinInitialized)

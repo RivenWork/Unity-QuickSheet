@@ -19,15 +19,15 @@ namespace UnityQuickSheet
     [Serializable]
     public class ScriptPrescription
     {
-        public string className               = string.Empty;
-        public string spreadsheetName         = string.Empty;
-        public string worksheetClassName      = string.Empty; // used for ScriptableObject class name.
-        public string dataClassName           = string.Empty;
+        public string className = string.Empty;
+        public string spreadsheetName = string.Empty;
+        public string worksheetClassName = string.Empty; // used for ScriptableObject class name.
+        public string dataClassName = string.Empty;
         public string assetFileCreateFuncName = string.Empty;
-        public string template                = string.Empty;
+        public string template = string.Empty;
 
-        public string importedFilePath        = string.Empty; // should start with "Assets" not full path
-        public string assetFilepath           = string.Empty; // should start with "Assets" not full path
+        public string importedFilePath = string.Empty; // should start with "Assets" not full path
+        public string assetFilepath = string.Empty; // should start with "Assets" not full path
         public string assetPostprocessorClass = string.Empty;
 
         public MemberFieldData[] memberFields;
@@ -35,9 +35,9 @@ namespace UnityQuickSheet
         /// <summary>
         /// Reserved for future usage to make it easy for explicitly converting.
         /// </summary>
-        public Dictionary<string, string> mStringReplacements = new Dictionary<string, string> ();
+        public Dictionary<string, string> mStringReplacements = new Dictionary<string, string>();
     }
-    
+
     /// <summary>
     /// Represent type of an each cell.
     /// </summary>
@@ -58,44 +58,66 @@ namespace UnityQuickSheet
     {
         public CellType type = CellType.Undefined;
         private string name;
-        
+
         public static bool Valid(string title)
         {
-            return Regex.IsMatch(title, @"\s*(:string:integer)", RegexOptions.IgnoreCase);	
+            return Regex.IsMatch(title, @"\s*(:string:integer)", RegexOptions.IgnoreCase);
         }
-        
+
         public string Name
         {
             get { return name; }
             set { name = value; }
         }
-        
+
         public string Type
         {
-            get 
+            get
             {
-                switch(type)
+                switch (type)
                 {
-                case CellType.String:
-                    return "string";
-                case CellType.Short:
-                    return "short";
-                case CellType.Int:
-                    return "int";
-                case CellType.Long:
-                    return "long";
-                case CellType.Float:
-                    return "float";
-                case CellType.Double:
-                    return "double";
-                case CellType.Enum:
-                    return "enum";
-                case CellType.Bool:
-                    return "bool";
-                default:
-                    return "string";
+                    case CellType.String:
+                        return "string";
+                    case CellType.Short:
+                        return "short";
+                    case CellType.Int:
+                        return "int";
+                    case CellType.Long:
+                        return "long";
+                    case CellType.Float:
+                        return "float";
+                    case CellType.Double:
+                        return "double";
+                    case CellType.Enum:
+                        return "enum";
+                    case CellType.Bool:
+                        return "bool";
+                    default:
+                        return "string";
                 }
             }
+        }
+
+        public static CellType GetType(string type)
+        {
+            CellType ret;
+            if (string.Compare(type, "int") == 0)
+                ret = CellType.Int;
+            if (string.Compare(type, "long") == 0)
+                ret = CellType.Long;
+            else if (string.Compare(type, "string") == 0)
+                ret = CellType.String;
+            else if (string.Compare(type, "float") == 0)
+                ret = CellType.Float;
+            else if (string.Compare(type, "double") == 0)
+                ret = CellType.Double;
+            else if (string.Compare(type, "enum") == 0)
+                ret = CellType.Enum;
+            else if (string.Compare(type, "bool") == 0)
+                ret = CellType.Bool;
+            else
+                ret = CellType.Undefined;
+            return ret;
         }
 
         public bool IsArrayType { get; set; }
@@ -109,7 +131,7 @@ namespace UnityQuickSheet
         [System.Obsolete("Use default constructor.")]
         public MemberFieldData(string def)
         {
-            string[] strSplit = def.Split (':');
+            string[] strSplit = def.Split(':');
             if (strSplit.Length > 1)
             {
                 string typedef = strSplit[1];
@@ -118,7 +140,7 @@ namespace UnityQuickSheet
                     type = CellType.Int;
                 if (string.Compare(typedef, "long") == 0)
                     type = CellType.Long;
-                else if (string.Compare(typedef,"string") == 0)
+                else if (string.Compare(typedef, "string") == 0)
                     type = CellType.String;
                 else if (string.Compare(typedef, "float") == 0)
                     type = CellType.Float;
@@ -131,13 +153,13 @@ namespace UnityQuickSheet
                 else
                 {
                     type = CellType.Undefined;
-                    Debug.LogError ("Wrong cell type is defined: " + typedef);
+                    Debug.LogError("Wrong cell type is defined: " + typedef);
                 }
             }
             else
                 type = CellType.Undefined;
 
-            name = strSplit [0];
+            name = strSplit[0];
         }
     }
 

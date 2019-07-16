@@ -89,9 +89,6 @@ namespace UnityQuickSheet
             GUILayout.Label("Path Settings:", headerStyle);
 
             machine.TemplatePath = EditorGUILayout.TextField("Template: ", machine.TemplatePath);
-            machine.RuntimeClassPath = EditorGUILayout.TextField("Runtime: ", machine.RuntimeClassPath);
-            machine.EditorClassPath = EditorGUILayout.TextField("Editor:", machine.EditorClassPath);
-            machine.DataFilePath = EditorGUILayout.TextField("Data:", machine.DataFilePath);
 
             EditorGUILayout.Separator();
 
@@ -112,12 +109,17 @@ namespace UnityQuickSheet
                 CreateDataClassScript();
                 CreateAssetCreationScript();
 
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+
                 Debug.Log("Excel Done!");
             }
 
             if (GUILayout.Button("Generate"))
             {
-
+                var assets = AssetDatabase.FindAssets(string.Empty, new string[] { machine.fileFolder });
+                foreach (var item in assets)
+                    AssetDatabase.ImportAsset(AssetDatabase.GUIDToAssetPath(item));
             }
 
             GUILayout.EndHorizontal();
@@ -140,8 +142,9 @@ namespace UnityQuickSheet
             foreach (var fileInfo in files)
             {
                 var className = Path.GetFileNameWithoutExtension(fileInfo.Name);
+                var targetPath = Path.GetDirectoryName(AssetDatabase.GetAssetPath(target));
                 // check the directory path exists
-                string fullPath = TargetPathForClassScript(className);
+                string fullPath = Path.Combine(targetPath + "/Runtime", className + "SO." + "cs");
                 string folderPath = Path.GetDirectoryName(fullPath);
                 if (!Directory.Exists(folderPath))
                 {
@@ -155,8 +158,7 @@ namespace UnityQuickSheet
 
                 var sp = new ScriptPrescription()
                 {
-                    className = className + "Editor",
-                    worksheetClassName = className,
+                    className = className + "SO",
                     dataClassName = className + "ExcelData",
                     template = GetTemplate("ScriptableObjectClass"),
                 };
@@ -195,7 +197,8 @@ namespace UnityQuickSheet
             {
                 var className = Path.GetFileNameWithoutExtension(fileInfo.Name);
                 // check the directory path exists
-                string fullPath = TargetPathForClassScript(className);
+                var targetPath = Path.GetDirectoryName(AssetDatabase.GetAssetPath(target));
+                string fullPath = Path.Combine(targetPath + "/Editor", className + "SOEditor." + "cs");
                 string folderPath = Path.GetDirectoryName(fullPath);
                 if (!Directory.Exists(folderPath))
                 {
@@ -209,8 +212,8 @@ namespace UnityQuickSheet
 
                 var sp = new ScriptPrescription()
                 {
-                    className = className + "Editor",
-                    worksheetClassName = className,
+                    className = className + "SOEditor",
+                    worksheetClassName = className + "SO",
                     dataClassName = className + "ExcelData",
                     template = GetTemplate("ScriptableObjectEditorClass"),
                 };
@@ -249,7 +252,8 @@ namespace UnityQuickSheet
             {
                 var className = Path.GetFileNameWithoutExtension(fileInfo.Name);
                 // check the directory path exists
-                string fullPath = TargetPathForClassScript(className);
+                var targetPath = Path.GetDirectoryName(AssetDatabase.GetAssetPath(target));
+                string fullPath = Path.Combine(targetPath + "/Runtime", className + "ExcelData." + "cs");
                 string folderPath = Path.GetDirectoryName(fullPath);
                 if (!Directory.Exists(folderPath))
                 {
@@ -261,22 +265,24 @@ namespace UnityQuickSheet
                     return;
                 }
 
+                string error = string.Empty;
+                var titles = new ExcelQuery(fileInfo.FullName, 0).GetTitle(2, ref error);
+                var types = new ExcelQuery(fileInfo.FullName, 0).GetTitle(1, ref error);
+                var comment = new ExcelQuery(fileInfo.FullName, 0).GetTitle(0, ref error);
+
                 List<MemberFieldData> fieldList = new List<MemberFieldData>();
 
-                //FIXME: replace ValueType to CellType and support Enum type.
-                foreach (ColumnHeader header in machine.ColumnHeaderList)
+                for (int i = 0; i < titles.Length; i++)
                 {
                     MemberFieldData member = new MemberFieldData();
-                    member.Name = header.name;
-                    member.type = header.type;
-                    member.IsArrayType = header.isArray;
-
+                    member.Name = titles[i];
+                    member.type = MemberFieldData.GetType(types[i]);
                     fieldList.Add(member);
                 }
 
                 var sp = new ScriptPrescription
                 {
-                    className = machine.WorkSheetName + "Data",
+                    className = className + "ExcelData",
                     template = GetTemplate("DataClass"),
                     memberFields = fieldList.ToArray()
                 };
@@ -302,7 +308,8 @@ namespace UnityQuickSheet
             {
                 var className = Path.GetFileNameWithoutExtension(fileInfo.Name);
                 // check the directory path exists
-                string fullPath = TargetPathForClassScript(className);
+                var targetPath = Path.GetDirectoryName(AssetDatabase.GetAssetPath(target));
+                string fullPath = Path.Combine(targetPath + "/Editor", className + "AP." + "cs");
                 string folderPath = Path.GetDirectoryName(fullPath);
                 if (!Directory.Exists(folderPath))
                 {
@@ -314,32 +321,24 @@ namespace UnityQuickSheet
                     return;
                 }
 
-                var sp = new ScriptPrescription()
+                var sp = new ScriptPrescription
                 {
-                    className = className + "Editor",
-                    worksheetClassName = className,
+                    className = className + "SO",
                     dataClassName = className + "ExcelData",
-                    template = GetTemplate("ScriptableObjectEditorClass"),
+                    
+                    // where the imported excel file is.
                 };
+                sp.importedFilePath = fileInfo.FullName.Replace("\\", "/");
+                sp.importedFilePath = sp.importedFilePath.Substring(sp.importedFilePath.IndexOf("Assets/"));
+                sp.assetFilepath = Path.GetDirectoryName(AssetDatabase.GetAssetPath(target)).Replace("\\", "/") + "/Data/" + className + ".asset";
+                sp.assetPostprocessorClass = className + "AssetPostprocessor";
+                sp.template = GetTemplate("PostProcessor");
 
-                StreamWriter writer = null;
-                try
+                // write a script to the given folder.
+                using (var writer = new StreamWriter(fullPath))
                 {
-                    // write a script to the given folder.		
-                    writer = new StreamWriter(fullPath);
                     writer.Write(new ScriptGenerator(sp).ToString());
-                }
-                catch (System.Exception e)
-                {
-                    Debug.LogError(e);
-                }
-                finally
-                {
-                    if (writer != null)
-                    {
-                        writer.Close();
-                        writer.Dispose();
-                    }
+                    writer.Close();
                 }
             }
         }

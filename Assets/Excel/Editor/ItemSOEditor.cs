@@ -9,12 +9,12 @@ using UnityQuickSheet;
 ///
 /// !!! Machine generated code !!!
 ///
-[CustomEditor(typeof($WorkSheetClassName))]
-public class $ClassName : BaseExcelEditor<$WorkSheetClassName>
+[CustomEditor(typeof(ItemSO))]
+public class ItemSOEditor : BaseExcelEditor<ItemSO>
 {	    
     public override bool Load()
     {
-        $WorkSheetClassName targetData = target as $WorkSheetClassName;
+        ItemSO targetData = target as ItemSO;
 
         string path = targetData.SheetName;
         if (!File.Exists(path))
@@ -25,7 +25,7 @@ public class $ClassName : BaseExcelEditor<$WorkSheetClassName>
         ExcelQuery query = new ExcelQuery(path, 0);
         if (query != null && query.IsValid())
         {
-            targetData.dataArray = query.Deserialize<$DataClassName>(3).ToArray();
+            targetData.dataArray = query.Deserialize<ItemExcelData>(3).ToArray();
             EditorUtility.SetDirty(targetData);
             AssetDatabase.SaveAssets();
             return true;
