@@ -40,150 +40,209 @@ namespace UnityQuickSheet
 
             ExcelMachine machine = target as ExcelMachine;
 
-            GUILayout.Label("Excel Spreadsheet Settings:", headerStyle);
+            GUILayout.Label("Excel Settings:", headerStyle);
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label("File:", GUILayout.Width(50));
+            GUILayout.Label("Folder:", GUILayout.Width(50));
 
             string path = string.Empty;
-            if (string.IsNullOrEmpty(machine.excelFilePath))
+            if (string.IsNullOrEmpty(machine.fileFolder))
                 path = Application.dataPath;
             else
-                path = machine.excelFilePath;
+                path = machine.fileFolder;
 
-            machine.excelFilePath = GUILayout.TextField(path, GUILayout.Width(250));
+            machine.fileFolder = GUILayout.TextField(path, GUILayout.Width(250));
             if (GUILayout.Button("...", GUILayout.Width(20)))
             {
                 string folder = Path.GetDirectoryName(path);
 #if UNITY_EDITOR_WIN
-                path = EditorUtility.OpenFilePanel("Open Excel file", folder, "excel files;*.xls;*.xlsx");
+                path = EditorUtility.OpenFolderPanel("Open Excel file folder", folder, string.Empty);
 #else // for UNITY_EDITOR_OSX
-                path = EditorUtility.OpenFilePanel("Open Excel file", folder, "xls");
+                path = EditorUtility.OpenFolderPanel("Open Excel file folder", folder, string.Empty);
 #endif
                 if (path.Length != 0)
                 {
-                    machine.SpreadSheetName = Path.GetFileName(path);
-
-                    // the path should be relative not absolute one to make it work on any platform.
-                    int index = path.IndexOf("Assets");
-                    if (index >= 0)
+                    var dirInfo = new DirectoryInfo(path);
+                    if (dirInfo.Exists)
                     {
-                        // set relative path
-                        machine.excelFilePath = path.Substring(index);
-
-                        // pass absolute path
-                        machine.SheetNames = new ExcelQuery(path).GetSheetNames();
-                    }
-                    else
-                    {
-                        EditorUtility.DisplayDialog("Error",
-                            @"Wrong folder is selected.
+                        int index = path.IndexOf("Assets");
+                        if (index >= 0)
+                        {
+                            // set relative path
+                            machine.fileFolder = path.Substring(index);
+                        }
+                        else
+                        {
+                            EditorUtility.DisplayDialog("Error",
+                                @"Wrong folder is selected.
                         Set a folder under the 'Assets' folder! \n
                         The excel file should be anywhere under  the 'Assets' folder", "OK");
-                        return;
+                            return;
+                        }
                     }
                 }
             }
             GUILayout.EndHorizontal();
 
-            // Failed to get sheet name so we just return not to make editor on going.
-            if (machine.SheetNames.Length == 0)
-            {
-                EditorGUILayout.Separator();
-                EditorGUILayout.LabelField("Error: Failed to retrieve the specified excel file.");
-                EditorGUILayout.LabelField("If the excel file is opened, close it then reopen it again.");
-                return;
-            }
-
-            // spreadsheet name should be read-only
-            EditorGUILayout.TextField("Spreadsheet File: ", machine.SpreadSheetName);
-
-            EditorGUILayout.Space();
-
-            using (new GUILayout.HorizontalScope())
-            {
-                EditorGUILayout.LabelField("Worksheet: ", GUILayout.Width(100));
-                machine.CurrentSheetIndex = EditorGUILayout.Popup(machine.CurrentSheetIndex, machine.SheetNames);
-                if (machine.SheetNames != null)
-                    machine.WorkSheetName = machine.SheetNames[machine.CurrentSheetIndex];
-
-                if (GUILayout.Button("Refresh", GUILayout.Width(60)))
-                {
-                    // reopen the excel file e.g) new worksheet is added so need to reopen.
-                    machine.SheetNames = new ExcelQuery(machine.excelFilePath).GetSheetNames();
-
-                    // one of worksheet was removed, so reset the selected worksheet index
-                    // to prevent the index out of range error.
-                    if (machine.SheetNames.Length <= machine.CurrentSheetIndex)
-                    {
-                        machine.CurrentSheetIndex = 0;
-
-                        string message = "Worksheet was changed. Check the 'Worksheet' and 'Update' it again if it is necessary.";
-                        EditorUtility.DisplayDialog("Info", message, "OK");
-                    }
-                }
-            }
-
             EditorGUILayout.Separator();
-
-            GUILayout.BeginHorizontal();
-
-            if (machine.HasColumnHeader())
-            {
-                if (GUILayout.Button("Update"))
-                    Import();
-                if (GUILayout.Button("Reimport"))
-                    Import(true);
-            }
-            else
-            {
-                if (GUILayout.Button("Import"))
-                    Import();
-            }
-
-            GUILayout.EndHorizontal();
-
-            EditorGUILayout.Separator();
-
-            DrawHeaderSetting(machine);
-
-            EditorGUILayout.Separator();
-
+            
             GUILayout.Label("Path Settings:", headerStyle);
 
             machine.TemplatePath = EditorGUILayout.TextField("Template: ", machine.TemplatePath);
             machine.RuntimeClassPath = EditorGUILayout.TextField("Runtime: ", machine.RuntimeClassPath);
             machine.EditorClassPath = EditorGUILayout.TextField("Editor:", machine.EditorClassPath);
-            //machine.DataFilePath = EditorGUILayout.TextField("Data:", machine.DataFilePath);
-
-            machine.onlyCreateDataClass = EditorGUILayout.Toggle("Only DataClass", machine.onlyCreateDataClass);
+            machine.DataFilePath = EditorGUILayout.TextField("Data:", machine.DataFilePath);
 
             EditorGUILayout.Separator();
 
+            GUILayout.BeginHorizontal();
+
+            if (GUILayout.Button("Import"))
+            {
+                var targetPath = Path.GetDirectoryName(AssetDatabase.GetAssetPath(target));
+                if (!AssetDatabase.IsValidFolder(targetPath + "/Runtime"))
+                    AssetDatabase.CreateFolder(targetPath, "Runtime");
+                if (!AssetDatabase.IsValidFolder(targetPath + "/Editor"))
+                    AssetDatabase.CreateFolder(targetPath, "Editor");
+                if (!AssetDatabase.IsValidFolder(targetPath + "/Data"))
+                    AssetDatabase.CreateFolder(targetPath, "Data");
+
+                CreateScriptableObjectClassScript();
+                CreateScriptableObjectEditorClassScript();
+                //CreateDataClassScript();
+                //CreateAssetCreationScript();
+
+                Debug.Log("Excel Done!");
+            }
+
             if (GUILayout.Button("Generate"))
             {
-                if (string.IsNullOrEmpty(machine.SpreadSheetName) || string.IsNullOrEmpty(machine.WorkSheetName))
-                {
-                    Debug.LogWarning("No spreadsheet or worksheet is specified.");
-                    return;
-                }
 
-	            Directory.CreateDirectory(Application.dataPath + Path.DirectorySeparatorChar + machine.RuntimeClassPath);
-	            Directory.CreateDirectory(Application.dataPath + Path.DirectorySeparatorChar + machine.EditorClassPath);
-
-                ScriptPrescription sp = Generate(machine);
-                if (sp != null)
-                {
-                    Debug.Log("Successfully generated!");
-                }
-                else
-                    Debug.LogError("Failed to create a script from excel.");
             }
+
+            GUILayout.EndHorizontal();
 
             if (GUI.changed)
             {
                 EditorUtility.SetDirty(machine);
             }
+        }
+
+        void CreateScriptableObjectClassScript()
+        {
+            ExcelMachine machine = target as ExcelMachine;
+
+#if UNITY_EDITOR_WIN
+            var files = new DirectoryInfo(machine.fileFolder).GetFiles().Where(x => x.Extension == ".xlsx");
+#else // for UNITY_EDITOR_OSX
+            var files = new DirectoryInfo(machine.fileFolder).GetFiles().Where(x => x.Extension == ".xls");
+#endif
+            foreach (var fileInfo in files)
+            {
+                var className = Path.GetFileNameWithoutExtension(fileInfo.Name);
+                // check the directory path exists
+                string fullPath = TargetPathForClassScript(className);
+                string folderPath = Path.GetDirectoryName(fullPath);
+                if (!Directory.Exists(folderPath))
+                {
+                    EditorUtility.DisplayDialog(
+                        "Warning",
+                        "The folder for runtime script files does not exist. Check the path " + folderPath + " exists.",
+                        "OK"
+                    );
+                    return;
+                }
+
+                var sp = new ScriptPrescription()
+                {
+                    className = className + "Editor",
+                    worksheetClassName = className,
+                    dataClassName = className + "ExcelData",
+                    template = GetTemplate("ScriptableObjectClass"),
+                };
+
+                StreamWriter writer = null;
+                try
+                {
+                    // write a script to the given folder.		
+                    writer = new StreamWriter(fullPath);
+                    writer.Write(new ScriptGenerator(sp).ToString());
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError(e.Message);
+                }
+                finally
+                {
+                    if (writer != null)
+                    {
+                        writer.Close();
+                        writer.Dispose();
+                    }
+                }
+            }
+        }
+        void CreateScriptableObjectEditorClassScript()
+        {
+            ExcelMachine machine = target as ExcelMachine;
+
+#if UNITY_EDITOR_WIN
+            var files = new DirectoryInfo(machine.fileFolder).GetFiles().Where(x => x.Extension == ".xlsx");
+#else // for UNITY_EDITOR_OSX
+            var files = new DirectoryInfo(machine.fileFolder).GetFiles().Where(x => x.Extension == ".xls");
+#endif
+            foreach (var fileInfo in files)
+            {
+                var className = Path.GetFileNameWithoutExtension(fileInfo.Name);
+                // check the directory path exists
+                string fullPath = TargetPathForClassScript(className);
+                string folderPath = Path.GetDirectoryName(fullPath);
+                if (!Directory.Exists(folderPath))
+                {
+                    EditorUtility.DisplayDialog(
+                        "Warning",
+                        "The folder for runtime script files does not exist. Check the path " + folderPath + " exists.",
+                        "OK"
+                    );
+                    return;
+                }
+
+                var sp = new ScriptPrescription()
+                {
+                    className = className + "Editor",
+                    worksheetClassName = className,
+                    dataClassName = className + "ExcelData",
+                    template = GetTemplate("ScriptableObjectEditorClass"),
+                };
+
+                StreamWriter writer = null;
+                try
+                {
+                    // write a script to the given folder.		
+                    writer = new StreamWriter(fullPath);
+                    writer.Write(new ScriptGenerator(sp).ToString());
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError(e);
+                }
+                finally
+                {
+                    if (writer != null)
+                    {
+                        writer.Close();
+                        writer.Dispose();
+                    }
+                }
+            }
+        }
+        void CreateDataClassScript()
+        {
+
+        }
+        void CreateAssetCreationScript()
+        {
+
         }
 
         /// <summary>
@@ -205,7 +264,7 @@ namespace UnityQuickSheet
 
             if (!File.Exists(path))
             {
-                string msg = string.Format("File at {0} does not exist.",path);
+                string msg = string.Format("File at {0} does not exist.", path);
                 EditorUtility.DisplayDialog("Error", msg, "OK");
                 return;
             }
@@ -221,7 +280,7 @@ namespace UnityQuickSheet
             else
             {
                 // check the column header is valid
-                foreach(string column in titles)
+                foreach (string column in titles)
                 {
                     if (!IsValidHeader(column))
                     {
@@ -243,7 +302,7 @@ namespace UnityQuickSheet
                     .Where(e => headerDic.ContainsKey(e) == true)
                     .Select(t => new ColumnHeader { name = t, type = headerDic[t].type, isArray = headerDic[t].isArray, OrderNO = headerDic[t].OrderNO });
 
-                
+
                 // collect newly added or changed column headers
                 var changed = titleList.Select(t => GetColumnHeaderString(t))
                     .Where(e => headerDic.ContainsKey(e) == false)
@@ -274,6 +333,62 @@ namespace UnityQuickSheet
             AssetDatabase.SaveAssets();
         }
 
+        protected void ImportAll()
+        {
+            ExcelMachine machine = target as ExcelMachine;
+
+            foreach (var fileInfo in new DirectoryInfo(machine.fileFolder).GetFiles())
+            {
+                var path = fileInfo.FullName;
+
+                if (string.IsNullOrEmpty(path))
+                {
+                    string msg = "You should specify spreadsheet file first!";
+                    EditorUtility.DisplayDialog("Error", msg, "OK");
+                    return;
+                }
+
+                if (!File.Exists(path))
+                {
+                    string msg = string.Format("File at {0} does not exist.", path);
+                    EditorUtility.DisplayDialog("Error", msg, "OK");
+                    return;
+                }
+
+                string error = string.Empty;
+                var titles = new ExcelQuery(path, 0).GetTitle(2, ref error);
+                if (titles == null || !string.IsNullOrEmpty(error))
+                {
+                    EditorUtility.DisplayDialog("Error", error, "OK");
+                    return;
+                }
+                else
+                {
+                    // check the column header is valid
+                    foreach (string column in titles)
+                    {
+                        if (!IsValidHeader(column))
+                        {
+                            error = string.Format(@"Invalid column header name {0}. Any c# keyword should not be used for column header. Note it is not case sensitive.", column);
+                            EditorUtility.DisplayDialog("Error", error, "OK");
+                            return;
+                        }
+                    }
+                }
+
+                List<string> titleList = titles.ToList();
+
+                if (titleList.Count == 0)
+                {
+                    string msg = string.Format("An empty workhheet: [{0}] ", 0);
+                    Debug.LogWarning(msg);
+                }
+            }
+
+            EditorUtility.SetDirty(machine);
+            AssetDatabase.SaveAssets();
+        }
+
         /// <summary>
         /// Generate AssetPostprocessor editor script file.
         /// </summary>
@@ -282,14 +397,14 @@ namespace UnityQuickSheet
             ExcelMachine machine = target as ExcelMachine;
 
             sp.className = machine.WorkSheetName;
-            sp.dataClassName = machine.WorkSheetName + "Data";
+            sp.dataClassName = machine.WorkSheetName + "EData";
             sp.worksheetClassName = machine.WorkSheetName;
 
             // where the imported excel file is.
-            sp.importedFilePath = machine.excelFilePath;
+            sp.importedFilePath = machine.fileFolder;
 
             // path where the .asset file will be created.
-            string path = Path.GetDirectoryName(machine.excelFilePath).Replace("\\", "/");
+            string path = Path.GetDirectoryName(machine.fileFolder).Replace("\\", "/");
             path += "/" + machine.WorkSheetName + ".asset";
             sp.assetFilepath = path;
             sp.assetPostprocessorClass = machine.WorkSheetName + "AssetPostprocessor";

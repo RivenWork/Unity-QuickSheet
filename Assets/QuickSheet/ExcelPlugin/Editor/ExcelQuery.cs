@@ -43,11 +43,11 @@ namespace UnityQuickSheet
                         workbook = new HSSFWorkbook(fileStream);
                     else if (extension == "xlsx")
                     {
-                    #if UNITY_EDITOR_OSX
+#if UNITY_EDITOR_OSX
                         throw new Exception("xlsx is not supported on OSX.");
-                    #else
+#else
                         workbook = new XSSFWorkbook(fileStream);
-                    #endif
+#endif
                     }
                     else
                     {
@@ -57,6 +57,41 @@ namespace UnityQuickSheet
                     //NOTE: An empty sheetName can be available. Nothing to do with an empty sheetname.
                     if (!string.IsNullOrEmpty(sheetName))
                         sheet = workbook.GetSheet(sheetName);
+
+                    this.filepath = path;
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError(e.Message);
+            }
+        }
+
+        public ExcelQuery(string path, int sheetIndex)
+        {
+            try
+            {
+                using (FileStream fileStream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    string extension = GetSuffix(path);
+
+                    if (extension == "xls")
+                        workbook = new HSSFWorkbook(fileStream);
+                    else if (extension == "xlsx")
+                    {
+#if UNITY_EDITOR_OSX
+                        throw new Exception("xlsx is not supported on OSX.");
+#else
+                        workbook = new XSSFWorkbook(fileStream);
+#endif
+                    }
+                    else
+                    {
+                        throw new Exception("Wrong file.");
+                    }
+
+                    //NOTE: An empty sheetName can be available. Nothing to do with an empty sheetname.
+                    sheet = workbook.GetSheetAt(sheetIndex);
 
                     this.filepath = path;
                 }
