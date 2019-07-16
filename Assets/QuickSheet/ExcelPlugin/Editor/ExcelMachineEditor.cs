@@ -109,8 +109,8 @@ namespace UnityQuickSheet
 
                 CreateScriptableObjectClassScript();
                 CreateScriptableObjectEditorClassScript();
-                //CreateDataClassScript();
-                //CreateAssetCreationScript();
+                CreateDataClassScript();
+                CreateAssetCreationScript();
 
                 Debug.Log("Excel Done!");
             }
@@ -238,11 +238,110 @@ namespace UnityQuickSheet
         }
         void CreateDataClassScript()
         {
+            ExcelMachine machine = target as ExcelMachine;
 
+#if UNITY_EDITOR_WIN
+            var files = new DirectoryInfo(machine.fileFolder).GetFiles().Where(x => x.Extension == ".xlsx");
+#else // for UNITY_EDITOR_OSX
+            var files = new DirectoryInfo(machine.fileFolder).GetFiles().Where(x => x.Extension == ".xls");
+#endif
+            foreach (var fileInfo in files)
+            {
+                var className = Path.GetFileNameWithoutExtension(fileInfo.Name);
+                // check the directory path exists
+                string fullPath = TargetPathForClassScript(className);
+                string folderPath = Path.GetDirectoryName(fullPath);
+                if (!Directory.Exists(folderPath))
+                {
+                    EditorUtility.DisplayDialog(
+                        "Warning",
+                        "The folder for runtime script files does not exist. Check the path " + folderPath + " exists.",
+                        "OK"
+                    );
+                    return;
+                }
+
+                List<MemberFieldData> fieldList = new List<MemberFieldData>();
+
+                //FIXME: replace ValueType to CellType and support Enum type.
+                foreach (ColumnHeader header in machine.ColumnHeaderList)
+                {
+                    MemberFieldData member = new MemberFieldData();
+                    member.Name = header.name;
+                    member.type = header.type;
+                    member.IsArrayType = header.isArray;
+
+                    fieldList.Add(member);
+                }
+
+                var sp = new ScriptPrescription
+                {
+                    className = machine.WorkSheetName + "Data",
+                    template = GetTemplate("DataClass"),
+                    memberFields = fieldList.ToArray()
+                };
+
+                // write a script to the given folder.		
+                using (var writer = new StreamWriter(fullPath))
+                {
+                    writer.Write(new ScriptGenerator(sp).ToString());
+                    writer.Close();
+                }
+            }
         }
         void CreateAssetCreationScript()
         {
+            ExcelMachine machine = target as ExcelMachine;
 
+#if UNITY_EDITOR_WIN
+            var files = new DirectoryInfo(machine.fileFolder).GetFiles().Where(x => x.Extension == ".xlsx");
+#else // for UNITY_EDITOR_OSX
+            var files = new DirectoryInfo(machine.fileFolder).GetFiles().Where(x => x.Extension == ".xls");
+#endif
+            foreach (var fileInfo in files)
+            {
+                var className = Path.GetFileNameWithoutExtension(fileInfo.Name);
+                // check the directory path exists
+                string fullPath = TargetPathForClassScript(className);
+                string folderPath = Path.GetDirectoryName(fullPath);
+                if (!Directory.Exists(folderPath))
+                {
+                    EditorUtility.DisplayDialog(
+                        "Warning",
+                        "The folder for runtime script files does not exist. Check the path " + folderPath + " exists.",
+                        "OK"
+                    );
+                    return;
+                }
+
+                var sp = new ScriptPrescription()
+                {
+                    className = className + "Editor",
+                    worksheetClassName = className,
+                    dataClassName = className + "ExcelData",
+                    template = GetTemplate("ScriptableObjectEditorClass"),
+                };
+
+                StreamWriter writer = null;
+                try
+                {
+                    // write a script to the given folder.		
+                    writer = new StreamWriter(fullPath);
+                    writer.Write(new ScriptGenerator(sp).ToString());
+                }
+                catch (System.Exception e)
+                {
+                    Debug.LogError(e);
+                }
+                finally
+                {
+                    if (writer != null)
+                    {
+                        writer.Close();
+                        writer.Dispose();
+                    }
+                }
+            }
         }
 
         /// <summary>
