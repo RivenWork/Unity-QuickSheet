@@ -17,8 +17,8 @@ public class ExcelExampleData
   public string Name { get {return name; } set { name = value;} }
   
   [SerializeField]
-  float strength;
-  public float Strength { get {return strength; } set { strength = value;} }
+  int strength;
+  public int Strength { get {return strength; } set { strength = value;} }
   
   [SerializeField]
   Difficulty difficulty;
